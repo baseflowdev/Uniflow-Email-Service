@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
@@ -138,7 +139,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ? 'Let\'s set up your profile'
               : 'Complete your profile',
           style: AppTheme.headingLarge.copyWith(
-            color: AppColors.textPrimary,
+            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+            fontWeight: FontWeight.bold, // Added bold for better visibility
           ),
         )
             .animate()
@@ -162,7 +164,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ? 'This helps us personalize your experience'
               : 'Add some details to get started',
           style: AppTheme.bodyLarge.copyWith(
-            color: AppColors.textSecondary,
+            color: kIsWeb ? AppColors.textSecondary : AppColors.textLight.withOpacity(0.85), // Dark for web, soft white for mobile
+            fontWeight: FontWeight.w500, // Added medium weight for better visibility
           ),
         )
             .animate()
@@ -227,7 +230,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           label: 'University (Optional)',
           hint: 'Enter your university name',
           icon: Icons.account_balance_outlined,
-          isOptional: true,
+          isOptional: false, // Set to false since we already have (Optional) in the label
         ),
       ],
     );
@@ -245,10 +248,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$label${isOptional ? ' (Optional)' : ''}',
+          label, // Removed duplicate (Optional) text
           style: AppTheme.bodyMedium.copyWith(
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
           ),
         ),
         const SizedBox(height: 8),
@@ -292,7 +295,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           'Academic Year',
           style: AppTheme.bodyMedium.copyWith(
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
           ),
         ),
         const SizedBox(height: 8),

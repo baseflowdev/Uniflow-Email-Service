@@ -27,29 +27,30 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              // Welcome Section
-              _buildWelcomeSection(),
-              
-              const SizedBox(height: 40),
-              
-              // Features Grid
-              Expanded(
-                child: _buildFeaturesGrid(),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  // Welcome Section
+                  _buildWelcomeSection(),
+
+                  const SizedBox(height: 40),
+
+                  // Features Grid
+                  _buildFeaturesGrid(),
+
+                  const SizedBox(height: 40),
+
+                  // Action Buttons
+                  _buildActionButtons(),
+                  
+                  // Add extra padding at the bottom to prevent overflow
+                  const SizedBox(height: 40),
+                ],
               ),
-              
-              const SizedBox(height: 40),
-              
-              // Action Buttons
-              _buildActionButtons(),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -60,26 +61,28 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
         
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0), // Reduced padding
           decoration: BoxDecoration(
             gradient: AppColors.primaryGradient,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16), // Reduced border radius
             boxShadow: [
               BoxShadow(
                 color: AppColors.shadowMedium,
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                blurRadius: 8, // Reduced blur
+                offset: const Offset(0, 2), // Reduced offset
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Added this to prevent overflow
             children: [
-              // Welcome Text
+              // Welcome Text - More compact
               Text(
                 'Welcome back!',
-                style: AppTheme.headingMedium.copyWith(
+                style: AppTheme.bodyLarge.copyWith( // Changed from headingMedium
                   color: AppColors.textLight,
+                  fontWeight: FontWeight.w600,
                 ),
               )
                   .animate()
@@ -91,14 +94,17 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
                     curve: Curves.easeOut,
                   ),
               
-              const SizedBox(height: 8),
+              const SizedBox(height: 4), // Reduced spacing
               
               Text(
-                user?.displayName ?? 'Student',
-                style: AppTheme.headingLarge.copyWith(
+                user?.name ?? 'Student', // Changed from displayName to name
+                style: AppTheme.headingMedium.copyWith( // Changed from headingLarge
                   color: AppColors.textLight,
-                  fontSize: 28,
+                  fontSize: 22, // Reduced font size
+                  fontWeight: FontWeight.bold,
                 ),
+                maxLines: 1, // Prevent text overflow
+                overflow: TextOverflow.ellipsis,
               )
                   .animate()
                   .fadeIn(
@@ -113,17 +119,10 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
                     curve: Curves.easeOut,
                   ),
               
-              const SizedBox(height: 16),
+              const SizedBox(height: 8), // Reduced spacing
               
-              // User Info
-              if (user != null) ...[
-                _buildUserInfo(user),
-              ],
-              
-              const SizedBox(height: 16),
-              
-              // Status Badge
-              _buildStatusBadge(user),
+              // Status Badge - More compact
+              _buildCompactStatusBadge(user),
             ],
           ),
         );
@@ -169,44 +168,44 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
     );
   }
 
-  Widget _buildStatusBadge(user) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: user?.isOfflineUser == true 
-            ? AppColors.warning.withOpacity(0.2)
-            : AppColors.success.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: user?.isOfflineUser == true 
-              ? AppColors.warning
-              : AppColors.success,
-          width: 1,
+  Widget _buildCompactStatusBadge(user) {
+    return Row(
+      children: [
+        Icon(
+          user?.isOfflineUser == true 
+              ? Icons.cloud_off 
+              : Icons.cloud_done,
+          color: AppColors.textLight,
+          size: 16, // Reduced icon size
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            user?.isOfflineUser == true ? Icons.cloud_off : Icons.cloud_done,
-            size: 16,
-            color: user?.isOfflineUser == true 
-                ? AppColors.warning
-                : AppColors.success,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            user?.isOfflineUser == true ? 'Offline Mode' : 'Online Mode',
-            style: AppTheme.bodySmall.copyWith(
-              color: user?.isOfflineUser == true 
-                  ? AppColors.warning
-                  : AppColors.success,
-              fontWeight: FontWeight.w600,
+        const SizedBox(width: 6), // Reduced spacing
+        Expanded( // Added Expanded to prevent overflow
+          child: Text(
+            user?.isOfflineUser == true 
+                ? 'Offline Mode' 
+                : 'Online & Synced',
+            style: AppTheme.bodySmall.copyWith( // Changed from bodyMedium
+              color: AppColors.textLight,
+              fontWeight: FontWeight.w500,
             ),
+            maxLines: 1, // Prevent text overflow
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
-      ),
-    );
+        ),
+      ],
+    )
+        .animate()
+        .fadeIn(
+          delay: 400.ms,
+          duration: 600.ms,
+        )
+        .slideX(
+          begin: -0.3,
+          end: 0,
+          delay: 400.ms,
+          duration: 600.ms,
+          curve: Curves.easeOut,
+        );
   }
 
   Widget _buildFeaturesGrid() {
@@ -241,29 +240,46 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
       ),
     ];
 
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.1,
-      ),
-      itemCount: features.length,
-      itemBuilder: (context, index) {
-        return features[index]
-            .animate()
-            .fadeIn(
-              delay: Duration(milliseconds: 100 * index),
-              duration: 600.ms,
-            )
-            .slideY(
-              begin: 0.3,
-              end: 0,
-              delay: Duration(milliseconds: 100 * index),
-              duration: 600.ms,
-              curve: Curves.easeOut,
-            );
-      },
+    return Column(
+      children: [
+        // First row
+        Row(
+          children: [
+            Expanded(
+              child: features[0]
+                  .animate()
+                  .fadeIn(delay: 100.ms, duration: 600.ms)
+                  .slideY(begin: 0.3, end: 0, delay: 100.ms, duration: 600.ms, curve: Curves.easeOut),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: features[1]
+                  .animate()
+                  .fadeIn(delay: 200.ms, duration: 600.ms)
+                  .slideY(begin: 0.3, end: 0, delay: 200.ms, duration: 600.ms, curve: Curves.easeOut),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Second row
+        Row(
+          children: [
+            Expanded(
+              child: features[2]
+                  .animate()
+                  .fadeIn(delay: 300.ms, duration: 600.ms)
+                  .slideY(begin: 0.3, end: 0, delay: 300.ms, duration: 600.ms, curve: Curves.easeOut),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: features[3]
+                  .animate()
+                  .fadeIn(delay: 400.ms, duration: 600.ms)
+                  .slideY(begin: 0.3, end: 0, delay: 400.ms, duration: 600.ms, curve: Curves.easeOut),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -287,6 +303,9 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
                 onPressed: () => _showComingSoon('Upload File'),
                 icon: const Icon(Icons.upload),
                 label: const Text('Upload File'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -295,6 +314,9 @@ class _HomePlaceholderScreenState extends State<HomePlaceholderScreen> {
                 onPressed: () => _showComingSoon('New Note'),
                 icon: const Icon(Icons.add),
                 label: const Text('New Note'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
               ),
             ),
           ],

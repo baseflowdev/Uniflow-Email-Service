@@ -73,11 +73,16 @@ class _AppNavigatorState extends State<AppNavigator> {
   }
 
   Future<void> _initializeApp() async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    await userProvider.initialize();
+    // Wait a bit to ensure the widget tree is built
+    await Future.delayed(const Duration(milliseconds: 100));
     
     if (mounted) {
-      _navigateToNextScreen(userProvider);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await userProvider.initialize();
+      
+      if (mounted) {
+        _navigateToNextScreen(userProvider);
+      }
     }
   }
 

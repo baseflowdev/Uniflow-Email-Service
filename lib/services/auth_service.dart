@@ -82,7 +82,8 @@ class AuthService {
       await saveUserProfile(user);
       return user;
     } catch (e) {
-      throw Exception('Google sign in failed: $e');
+      // Return null instead of throwing to handle gracefully
+      return null;
     }
   }
 

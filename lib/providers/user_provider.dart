@@ -21,7 +21,6 @@ class UserProvider with ChangeNotifier {
 
   // Initialize the provider
   Future<void> initialize() async {
-    _setLoading(true);
     try {
       // Check if user has seen onboarding
       _hasSeenOnboarding = await _authService.hasSeenOnboarding();
@@ -34,8 +33,6 @@ class UserProvider with ChangeNotifier {
       _clearError();
     } catch (e) {
       _setError('Failed to initialize: $e');
-    } finally {
-      _setLoading(false);
     }
   }
 

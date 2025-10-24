@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:page_view_dot_indicator/page_view_dot_indicator.dart';
 import '../utils/app_colors.dart';
@@ -173,7 +174,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.title,
             style: AppTheme.headingLarge.copyWith(
-              color: AppColors.textPrimary,
+              color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+              fontWeight: FontWeight.bold, // Made text bolder
             ),
             textAlign: TextAlign.center,
           )
@@ -196,7 +198,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.description,
             style: AppTheme.bodyLarge.copyWith(
-              color: AppColors.textSecondary,
+              color: kIsWeb ? AppColors.textSecondary : AppColors.textLight.withOpacity(0.85), // Dark for web, soft white for mobile
+              fontWeight: FontWeight.w500, // Added medium weight
               height: 1.6,
             ),
             textAlign: TextAlign.center,

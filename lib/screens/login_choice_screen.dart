@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
@@ -75,7 +76,8 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
         Text(
           'Welcome to UniFlow',
           style: AppTheme.headingLarge.copyWith(
-            color: AppColors.textPrimary,
+            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+            fontWeight: FontWeight.bold, // Made text bolder
           ),
           textAlign: TextAlign.center,
         )
@@ -98,7 +100,8 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
         Text(
           'Choose how you\'d like to get started',
           style: AppTheme.bodyLarge.copyWith(
-            color: AppColors.textSecondary,
+            color: kIsWeb ? AppColors.textSecondary : AppColors.textLight.withOpacity(0.85), // Dark for web, soft white for mobile
+            fontWeight: FontWeight.w500, // Added medium weight
           ),
           textAlign: TextAlign.center,
         )
@@ -119,50 +122,55 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
   }
 
   Widget _buildLoginOptions() {
-    return Column(
-      children: [
-        // Continue without signing in
-        _buildLoginOption(
-          icon: Icons.person_outline,
-          title: 'Continue without signing in',
-          subtitle: 'Start using the app offline',
-          color: AppColors.grey600,
-          onTap: _continueOffline,
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Google Sign In
-        _buildLoginOption(
-          icon: Icons.login,
-          title: 'Sign in with Google',
-          subtitle: 'Sync your data across devices',
-          color: AppColors.primary,
-          onTap: _signInWithGoogle,
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Apple Sign In
-        _buildLoginOption(
-          icon: Icons.apple,
-          title: 'Sign in with Apple',
-          subtitle: 'Use your Apple ID',
-          color: AppColors.textPrimary,
-          onTap: _signInWithApple,
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // University Email Sign In
-        _buildLoginOption(
-          icon: Icons.email_outlined,
-          title: 'Sign in with University Email',
-          subtitle: 'Use your university credentials',
-          color: AppColors.accent,
-          onTap: _signInWithUniversityEmail,
-        ),
-      ],
+    return SingleChildScrollView( // Added SingleChildScrollView
+      child: Column(
+        children: [
+          // Continue without signing in
+          _buildLoginOption(
+            icon: Icons.person_outline,
+            title: 'Continue without signing in',
+            subtitle: 'Start using the app offline',
+            color: AppColors.grey600,
+            onTap: _continueOffline,
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Google Sign In
+          _buildLoginOption(
+            icon: Icons.login,
+            title: 'Sign in with Google',
+            subtitle: 'Sync your data across devices',
+            color: AppColors.primary,
+            onTap: _signInWithGoogle,
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Apple Sign In
+          _buildLoginOption(
+            icon: Icons.apple,
+            title: 'Sign in with Apple',
+            subtitle: 'Use your Apple ID',
+            color: AppColors.textPrimary,
+            onTap: _signInWithApple,
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // University Email Sign In
+          _buildLoginOption(
+            icon: Icons.email_outlined,
+            title: 'Sign in with University Email',
+            subtitle: 'Use your university credentials',
+            color: AppColors.accent,
+            onTap: _signInWithUniversityEmail,
+          ),
+          
+          // Add extra padding at the bottom to prevent overflow
+          const SizedBox(height: 40),
+        ],
+      ),
     );
   }
 
