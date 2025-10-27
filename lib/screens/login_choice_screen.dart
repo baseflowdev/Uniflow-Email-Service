@@ -7,6 +7,7 @@ import '../utils/app_theme.dart';
 import '../providers/user_provider.dart';
 import 'profile_setup_screen.dart';
 import 'home_placeholder_screen.dart';
+import 'main_screen.dart';
 
 class LoginChoiceScreen extends StatefulWidget {
   const LoginChoiceScreen({super.key});
@@ -23,22 +24,22 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
               
               // Header
               _buildHeader(),
               
-              const SizedBox(height: 60),
+              const SizedBox(height: 24),
               
               // Login Options
               Expanded(
                 child: _buildLoginOptions(),
               ),
               
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -51,15 +52,15 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
       children: [
         // App Icon
         Container(
-          width: 80,
-          height: 80,
+          width: 60,
+          height: 60,
           decoration: BoxDecoration(
             color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: const Icon(
             Icons.school,
-            size: 40,
+            size: 32,
             color: AppColors.primary,
           ),
         )
@@ -70,13 +71,13 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
             )
             .fadeIn(duration: 800.ms),
         
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         
         // Title
         Text(
           'Welcome to UniFlow',
           style: AppTheme.headingLarge.copyWith(
-            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.bold, // Made text bolder
           ),
           textAlign: TextAlign.center,
@@ -94,13 +95,13 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
               curve: Curves.easeOut,
             ),
         
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         
         // Subtitle
         Text(
           'Choose how you\'d like to get started',
           style: AppTheme.bodyLarge.copyWith(
-            color: kIsWeb ? AppColors.textSecondary : AppColors.textLight.withOpacity(0.85), // Dark for web, soft white for mobile
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             fontWeight: FontWeight.w500, // Added medium weight
           ),
           textAlign: TextAlign.center,
@@ -134,7 +135,7 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
             onTap: _continueOffline,
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           
           // Google Sign In
           _buildLoginOption(
@@ -145,7 +146,7 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
             onTap: _signInWithGoogle,
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           
           // Apple Sign In
           _buildLoginOption(
@@ -156,7 +157,7 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
             onTap: _signInWithApple,
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           
           // University Email Sign In
           _buildLoginOption(
@@ -168,7 +169,7 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
           ),
           
           // Add extra padding at the bottom to prevent overflow
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -181,13 +182,20 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
+    // Determine background and text colors based on theme
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color backgroundColor = isDark ? Colors.white : AppColors.surface;
+    final Color textColor = isDark ? Colors.black : Theme.of(context).colorScheme.onSurface;
+    final Color subtitleColor = isDark ? Colors.black54 : Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
+    final Color borderColor = isDark ? AppColors.grey300 : AppColors.grey200;
+    
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.grey200,
+          color: borderColor,
           width: 1,
         ),
         boxShadow: [
@@ -204,24 +212,24 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
           onTap: _isLoading ? null : onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 18.0),
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(
                     icon,
                     color: color,
-                    size: 24,
+                    size: 26,
                   ),
                 ),
                 
-                const SizedBox(width: 16),
+                const SizedBox(width: 15),
                 
                 Expanded(
                   child: Column(
@@ -231,14 +239,15 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
                         title,
                         style: AppTheme.bodyLarge.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: textColor,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         subtitle,
                         style: AppTheme.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                          color: subtitleColor,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -247,8 +256,8 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
                 
                 if (_isLoading)
                   const SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 22,
+                    height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                     ),
@@ -256,8 +265,8 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
                 else
                   Icon(
                     Icons.arrow_forward_ios,
-                    size: 16,
-                    color: AppColors.textSecondary,
+                    size: 15,
+                    color: subtitleColor,
                   ),
               ],
             ),
@@ -307,7 +316,7 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
           if (userProvider.isProfileComplete) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => const HomePlaceholderScreen(),
+                builder: (context) => const MainScreen(),
               ),
             );
           } else {

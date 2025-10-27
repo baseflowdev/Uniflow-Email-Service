@@ -97,6 +97,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
               
+              // Dashboard Section
+              _buildSectionHeader('Dashboard'),
+              Card(
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Show Motivational Quotes'),
+                      subtitle: const Text('Display motivational quotes on the dashboard'),
+                      value: settings.showMotivationalQuotes,
+                      onChanged: (value) {
+                        settingsProvider.toggleMotivationalQuotes();
+                      },
+                    ),
+                    SwitchListTile(
+                      title: const Text('Show Storage Summary'),
+                      subtitle: const Text('Display storage usage on the dashboard'),
+                      value: settings.showStorageSummary,
+                      onChanged: (value) {
+                        settingsProvider.toggleStorageSummary();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
               // Auto-save Section
               _buildSectionHeader('Auto-save'),
               Card(

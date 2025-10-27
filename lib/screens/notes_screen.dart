@@ -124,6 +124,9 @@ class _NotesScreenState extends State<NotesScreen> {
                           note: note,
                           onTap: () => _openNote(note),
                           onLongPress: () => _showNoteActionSheet(note),
+                          onPin: () => context.read<NoteProvider>().togglePin(note.id),
+                          onEdit: () => _openNote(note),
+                          onDelete: () => _showDeleteDialog(note),
                         ),
                       );
                     },
@@ -135,6 +138,7 @@ class _NotesScreenState extends State<NotesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'notes_fab',
         onPressed: _createNewNote,
         child: const Icon(Icons.note_add),
       ),

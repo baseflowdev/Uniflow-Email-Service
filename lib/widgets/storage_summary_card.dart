@@ -11,8 +11,7 @@ class StorageSummaryCard extends StatelessWidget {
       builder: (context, fileProvider, child) {
         final totalFiles = fileProvider.allFiles.length;
         final totalSize = fileProvider.allFiles
-            .where((file) => !file.isFolder)
-            .fold(0, (sum, file) => sum + file.size);
+            .fold<int>(0, (sum, file) => sum + file.size);
         
         return Card(
           child: Padding(

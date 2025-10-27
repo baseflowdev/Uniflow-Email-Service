@@ -85,7 +85,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: Text(
                     'Skip',
                     style: AppTheme.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -174,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.title,
             style: AppTheme.headingLarge.copyWith(
-              color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold, // Made text bolder
             ),
             textAlign: TextAlign.center,
@@ -198,7 +198,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.description,
             style: AppTheme.bodyLarge.copyWith(
-              color: kIsWeb ? AppColors.textSecondary : AppColors.textLight.withOpacity(0.85), // Dark for web, soft white for mobile
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w500, // Added medium weight
               height: 1.6,
             ),

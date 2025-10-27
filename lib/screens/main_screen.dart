@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uniflow/providers/app_provider.dart';
 import 'package:uniflow/screens/dashboard_screen.dart';
-import 'package:uniflow/screens/files_screen.dart';
+import 'package:uniflow/screens/files/files_screen.dart';
 import 'package:uniflow/screens/notes_screen.dart';
 import 'package:uniflow/screens/settings_screen.dart';
 

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uniflow/providers/file_provider.dart';
-import 'package:uniflow/widgets/file_card.dart';
 import 'package:uniflow/widgets/file_grid_view.dart';
 import 'package:uniflow/widgets/file_list_view.dart';
-import 'package:uniflow/screens/pdf_viewer_screen.dart';
+import 'package:uniflow/widgets/add_file_bottom_sheet.dart';
+import 'package:uniflow/screens/file_viewer_screen.dart';
+import 'package:uniflow/models/app_file.dart';
+import 'package:uniflow/models/app_folder.dart';
+import 'package:uniflow/utils/app_colors.dart';
 
 class FilesScreen extends StatefulWidget {
   const FilesScreen({super.key});
@@ -20,7 +23,7 @@ class _FilesScreenState extends State<FilesScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FileProvider>().loadFiles();
+      context.read<FileProvider>().initialize();
     });
   }
 
@@ -34,7 +37,22 @@ class _FilesScreenState extends State<FilesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Files'),
+        title: Consumer<FileProvider>(
+          builder: (context, fileProvider, child) {
+            if (fileProvider.currentFolderId != null) {
+              return Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => fileProvider.navigateBack(),
+                  ),
+                  const Text('Files'),
+                ],
+              );
+            }
+            return const Text('My Files');
+          },
+        ),
         actions: [
           Consumer<FileProvider>(
             builder: (context, fileProvider, child) {
@@ -45,36 +63,6 @@ class _FilesScreenState extends State<FilesScreen> {
                 onPressed: fileProvider.toggleViewMode,
               );
             },
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'create_folder':
-                  _showCreateFolderDialog();
-                  break;
-                case 'import_file':
-                  context.read<FileProvider>().importFile();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'create_folder',
-                child: ListTile(
-                  leading: Icon(Icons.create_new_folder),
-                  title: Text('Create Folder'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'import_file',
-                child: ListTile(
-                  leading: Icon(Icons.file_upload),
-                  title: Text('Import File'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -127,14 +115,14 @@ class _FilesScreenState extends State<FilesScreen> {
                   onRefresh: fileProvider.loadFiles,
                   child: fileProvider.isGridView
                       ? FileGridView(
-                          files: fileProvider.files,
-                          onFileTap: _onFileTap,
-                          onFileLongPress: _onFileLongPress,
+                          items: fileProvider.items,
+                          onItemTap: _onItemTap,
+                          onItemLongPress: _onItemLongPress,
                         )
                       : FileListView(
-                          files: fileProvider.files,
-                          onFileTap: _onFileTap,
-                          onFileLongPress: _onFileLongPress,
+                          items: fileProvider.items,
+                          onItemTap: _onItemTap,
+                          onItemLongPress: _onItemLongPress,
                         ),
                 );
               },
@@ -144,41 +132,44 @@ class _FilesScreenState extends State<FilesScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          context.read<FileProvider>().importFile();
+          _showAddFileBottomSheet();
         },
-        child: const Icon(Icons.file_upload),
+        child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _onFileTap(file) {
-    if (file.isFolder) {
-      context.read<FileProvider>().navigateToFolder(file.id);
-    } else if (file.isPdf) {
+  void _onItemTap(dynamic item) {
+    if (item is AppFolder) {
+      context.read<FileProvider>().navigateToFolder(item.id);
+    } else if (item is AppFile) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PdfViewerScreen(file: file),
-        ),
-      );
-    } else {
-      // Handle other file types
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Opening ${file.name}...'),
+          builder: (context) => FileViewerScreen(file: item),
         ),
       );
     }
   }
 
-  void _onFileLongPress(file) {
+  void _onItemLongPress(dynamic item) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => _buildFileActionSheet(file),
+      builder: (context) => _buildItemActionSheet(item),
     );
   }
 
-  Widget _buildFileActionSheet(file) {
+  void _showAddFileBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => AddFileBottomSheet(
+        onImportFile: () => context.read<FileProvider>().importFile(),
+        onCreateFolder: () => _showCreateFolderDialog(),
+      ),
+    );
+  }
+
+  Widget _buildItemActionSheet(dynamic item) {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -189,23 +180,25 @@ class _FilesScreenState extends State<FilesScreen> {
             title: const Text('Rename'),
             onTap: () {
               Navigator.pop(context);
-              _showRenameDialog(file);
+              _showRenameDialog(item);
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.move_to_inbox),
-            title: const Text('Move'),
-            onTap: () {
-              Navigator.pop(context);
-              _showMoveDialog(file);
-            },
-          ),
+          if (item is AppFile) ...[
+            ListTile(
+              leading: const Icon(Icons.move_to_inbox),
+              title: const Text('Move'),
+              onTap: () {
+                Navigator.pop(context);
+                _showMoveDialog(item);
+              },
+            ),
+          ],
           ListTile(
             leading: const Icon(Icons.delete, color: Colors.red),
             title: const Text('Delete', style: TextStyle(color: Colors.red)),
             onTap: () {
               Navigator.pop(context);
-              _showDeleteDialog(file);
+              _showDeleteDialog(item);
             },
           ),
         ],
@@ -275,8 +268,8 @@ class _FilesScreenState extends State<FilesScreen> {
     );
   }
 
-  void _showRenameDialog(file) {
-    final controller = TextEditingController(text: file.name);
+  void _showRenameDialog(dynamic item) {
+    final controller = TextEditingController(text: item.name);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -296,7 +289,11 @@ class _FilesScreenState extends State<FilesScreen> {
           ElevatedButton(
             onPressed: () {
               if (controller.text.isNotEmpty) {
-                context.read<FileProvider>().renameFile(file.id, controller.text);
+                if (item is AppFile) {
+                  context.read<FileProvider>().renameFile(item.id, controller.text);
+                } else if (item is AppFolder) {
+                  context.read<FileProvider>().renameFolder(item.id, controller.text);
+                }
                 Navigator.pop(context);
               }
             },
@@ -307,19 +304,20 @@ class _FilesScreenState extends State<FilesScreen> {
     );
   }
 
-  void _showMoveDialog(file) {
+  void _showMoveDialog(AppFile file) {
     // TODO: Implement move dialog with folder selection
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Move functionality coming soon')),
     );
   }
 
-  void _showDeleteDialog(file) {
+  void _showDeleteDialog(dynamic item) {
+    final isFolder = item is AppFolder;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete File'),
-        content: Text('Are you sure you want to delete "${file.name}"?'),
+        title: Text('Delete ${isFolder ? 'Folder' : 'File'}'),
+        content: Text('Are you sure you want to delete "${item.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -327,7 +325,11 @@ class _FilesScreenState extends State<FilesScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              context.read<FileProvider>().deleteFile(file.id);
+              if (item is AppFile) {
+                context.read<FileProvider>().deleteFile(item.id);
+              } else if (item is AppFolder) {
+                context.read<FileProvider>().deleteFolder(item.id);
+              }
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

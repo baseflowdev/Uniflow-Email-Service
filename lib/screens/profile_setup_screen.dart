@@ -6,6 +6,7 @@ import '../utils/app_colors.dart';
 import '../utils/app_theme.dart';
 import '../providers/user_provider.dart';
 import 'home_placeholder_screen.dart';
+import 'main_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final bool isOffline;
@@ -139,7 +140,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ? 'Let\'s set up your profile'
               : 'Complete your profile',
           style: AppTheme.headingLarge.copyWith(
-            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.bold, // Added bold for better visibility
           ),
         )
@@ -164,7 +165,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ? 'This helps us personalize your experience'
               : 'Add some details to get started',
           style: AppTheme.bodyLarge.copyWith(
-            color: kIsWeb ? AppColors.textSecondary : AppColors.textLight.withOpacity(0.85), // Dark for web, soft white for mobile
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             fontWeight: FontWeight.w500, // Added medium weight for better visibility
           ),
         )
@@ -251,7 +252,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           label, // Removed duplicate (Optional) text
           style: AppTheme.bodyMedium.copyWith(
             fontWeight: FontWeight.w600,
-            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -260,14 +261,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, color: AppColors.textSecondary),
+            hintStyle: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white70 
+                  : Colors.black54,
+            ),
+            prefixIcon: Icon(icon, color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white70 
+                : Colors.black54),
+            filled: true,
+            fillColor: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white.withOpacity(0.1)
+                : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.grey300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.grey300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -295,22 +307,41 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           'Academic Year',
           style: AppTheme.bodyMedium.copyWith(
             fontWeight: FontWeight.w600,
-            color: kIsWeb ? AppColors.textPrimary : AppColors.textLight.withOpacity(0.9), // Dark for web, soft white for mobile
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: _selectedYear,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white 
+                : Colors.black,
+          ),
+          dropdownColor: Theme.of(context).brightness == Brightness.dark 
+              ? const Color(0xFF1E1E1E) 
+              : Colors.white,
           decoration: InputDecoration(
             hintText: 'Select your academic year',
-            prefixIcon: const Icon(Icons.calendar_today, color: AppColors.textSecondary),
+            hintStyle: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white70 
+                  : Colors.black54,
+            ),
+            prefixIcon: Icon(Icons.calendar_today, color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white70 
+                : Colors.black54),
+            filled: true,
+            fillColor: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white.withOpacity(0.1)
+                : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.grey300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.grey300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -328,7 +359,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           items: _yearOptions.map((year) {
             return DropdownMenuItem(
               value: year,
-              child: Text(year),
+              child: Text(
+                year,
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.white 
+                      : Colors.black,
+                ),
+              ),
             );
           }).toList(),
           onChanged: (value) {
@@ -392,7 +430,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         if (success && mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const HomePlaceholderScreen(),
+              builder: (context) => const MainScreen(),
             ),
           );
         }
@@ -414,7 +452,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           if (success && mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => const HomePlaceholderScreen(),
+                builder: (context) => const MainScreen(),
               ),
             );
           }

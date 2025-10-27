@@ -5,6 +5,9 @@ class NoteCard extends StatelessWidget {
   final NoteModel note;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onPin;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   final bool isCompact;
 
   const NoteCard({
@@ -12,6 +15,9 @@ class NoteCard extends StatelessWidget {
     required this.note,
     this.onTap,
     this.onLongPress,
+    this.onPin,
+    this.onEdit,
+    this.onDelete,
     this.isCompact = false,
   });
 
@@ -90,13 +96,13 @@ class NoteCard extends StatelessWidget {
                 onSelected: (value) {
                   switch (value) {
                     case 'pin':
-                      onLongPress?.call();
+                      onPin?.call();
                       break;
                     case 'edit':
-                      onTap?.call();
+                      onEdit?.call();
                       break;
                     case 'delete':
-                      onLongPress?.call();
+                      onDelete?.call();
                       break;
                   }
                 },

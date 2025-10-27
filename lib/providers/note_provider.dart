@@ -28,6 +28,21 @@ class NoteProvider extends ChangeNotifier {
     return sortedNotes.take(5).toList();
   }
 
+  // Initialize the provider
+  Future<void> initialize() async {
+    try {
+      // Initialize service without loading data to avoid blocking
+      await _noteService.initialize();
+      
+      // Load data asynchronously without blocking
+      loadNotes().catchError((e) {
+        _setError('Failed to load notes: $e');
+      });
+    } catch (e) {
+      _setError('Failed to initialize: $e');
+    }
+  }
+
   List<NoteModel> get pinnedNotes {
     return _notes.where((note) => note.isPinned).toList();
   }
@@ -183,7 +198,13 @@ class NoteProvider extends ChangeNotifier {
   void _applyFilters() {
     _filteredNotes = _notes.where((note) {
       // Filter by current folder
-      if (note.folderId != _currentFolderId) return false;
+      // When in root folder (_currentFolderId is empty), show notes with null folderId
+      // When in a specific folder, show notes with matching folderId
+      if (_currentFolderId.isEmpty) {
+        if (note.folderId != null) return false;
+      } else {
+        if (note.folderId != _currentFolderId) return false;
+      }
       
       // Filter by search query
       if (_searchQuery.isNotEmpty) {
@@ -205,6 +226,16 @@ class NoteProvider extends ChangeNotifier {
 
   void _setLoading(bool loading) {
     _isLoading = loading;
+    notifyListeners();
+  }
+
+  void _setError(String error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  void _clearError() {
+    _error = null;
     notifyListeners();
   }
 

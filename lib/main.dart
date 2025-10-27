@@ -4,6 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'providers/user_provider.dart';
+import 'providers/app_provider.dart';
+import 'providers/file_provider.dart';
+import 'providers/note_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_choice_screen.dart';
@@ -35,15 +39,24 @@ class UniFlowApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider(create: (_) => FileProvider()),
+        ChangeNotifierProvider(create: (_) => NoteProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
-      child: Consumer<UserProvider>(
-        builder: (context, userProvider, child) {
+      child: Consumer2<UserProvider, SettingsProvider>(
+        builder: (context, userProvider, settingsProvider, child) {
+          // Get theme mode from settings (default to dark mode if not initialized yet)
+          final isDarkMode = settingsProvider.isInitialized 
+              ? settingsProvider.settings.isDarkMode 
+              : true;
+          
           return MaterialApp(
             title: 'UniFlow',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
+            themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
             home: const AppNavigator(),
             routes: {
               '/onboarding': (context) => const OnboardingScreen(),
@@ -78,7 +91,18 @@ class _AppNavigatorState extends State<AppNavigator> {
     
     if (mounted) {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      await userProvider.initialize();
+      final fileProvider = Provider.of<FileProvider>(context, listen: false);
+      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      
+      // Initialize providers in parallel to speed up initialization
+      // and run heavy operations in the background
+      await Future.wait([
+        userProvider.initialize(),
+        fileProvider.initialize(),
+        noteProvider.initialize(),
+        settingsProvider.initialize(),
+      ]);
       
       if (mounted) {
         _navigateToNextScreen(userProvider);

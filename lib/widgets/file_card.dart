@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:uniflow/models/file_model.dart';
+import 'package:uniflow/models/app_file.dart';
 
 class FileCard extends StatelessWidget {
-  final FileModel file;
+  final AppFile file;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isCompact;
@@ -87,7 +87,7 @@ class FileCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      file.displaySize,
+                      file.formattedSize,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(width: 8),
@@ -97,7 +97,7 @@ class FileCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _formatDate(file.modifiedAt),
+                      _formatDate(file.dateAdded),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -117,15 +117,13 @@ class FileCard extends StatelessWidget {
   }
 
   IconData _getFileIcon() {
-    if (file.isFolder) return Icons.folder;
-    if (file.isPdf) return Icons.picture_as_pdf;
-    if (file.isImage) return Icons.image;
-    if (file.isDocument) return Icons.description;
-    return Icons.insert_drive_file;
+    if (file.isPdf) return Icons.picture_as_pdf_rounded;
+    if (file.isImage) return Icons.image_rounded;
+    if (file.isDocument) return Icons.description_rounded;
+    return Icons.insert_drive_file_rounded;
   }
 
   Color _getFileColor(BuildContext context) {
-    if (file.isFolder) return Colors.orange;
     if (file.isPdf) return Colors.red;
     if (file.isImage) return Colors.green;
     if (file.isDocument) return Colors.blue;
