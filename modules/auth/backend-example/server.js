@@ -1,11 +1,74 @@
 const express = require('express');
 const sgMail = require('@sendgrid/mail');
 const cors = require('cors');
+const admin = require('firebase-admin');
+const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize Firebase Admin
+let firebaseAdminInitialized = false;
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      }),
+    });
+    firebaseAdminInitialized = true;
+    console.log('✅ Firebase Admin initialized successfully');
+  } catch (error) {
+    console.log('⚠️  Firebase Admin initialization failed:', error.message);
+  }
+} else {
+  console.log('⚠️  Firebase Admin credentials not found in environment variables');
+}
+
+// Initialize MongoDB
+let mongoClient = null;
+let usersCollection = null;
+if (process.env.MONGODB_URI) {
+  mongoClient = new MongoClient(process.env.MONGODB_URI);
+  (async () => {
+    try {
+      await mongoClient.connect();
+      const db = mongoClient.db('uniflow');
+      usersCollection = db.collection('users');
+      console.log('✅ MongoDB connected successfully');
+    } catch (error) {
+      console.log('⚠️  MongoDB connection failed:', error.message);
+    }
+  })();
+} else {
+  console.log('⚠️  MONGODB_URI not found in environment variables');
+}
+
+// Middleware to verify Firebase ID token
+async function verifyFirebaseToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'No authorization token provided' });
+  }
+
+  const token = authHeader.split('Bearer ')[1];
+  
+  if (!firebaseAdminInitialized) {
+    return res.status(500).json({ success: false, error: 'Firebase Admin not initialized' });
+  }
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, error: 'Invalid or expired token' });
+  }
+}
 
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY) {
@@ -79,13 +142,103 @@ app.post('/api/send-verification-email', async (req, res) => {
   }
 });
 
+// User profile endpoints
+// Create or update user profile
+app.post('/api/users', verifyFirebaseToken, async (req, res) => {
+  try {
+    if (!usersCollection) {
+      return res.status(500).json({ success: false, error: 'Database not configured' });
+    }
+
+    const userId = req.user.uid;
+    const userData = {
+      ...req.body,
+      id: userId,
+      updatedAt: new Date(),
+    };
+
+    // Upsert user profile
+    await usersCollection.updateOne(
+      { id: userId },
+      { $set: userData },
+      { upsert: true }
+    );
+
+    res.json({ success: true, user: userData });
+  } catch (error) {
+    console.error('Error saving user:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get current user profile
+app.get('/api/users/me', verifyFirebaseToken, async (req, res) => {
+  try {
+    if (!usersCollection) {
+      return res.status(500).json({ success: false, error: 'Database not configured' });
+    }
+
+    const userId = req.user.uid;
+    const user = await usersCollection.findOne({ id: userId });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error getting user:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update user profile
+app.put('/api/users/me', verifyFirebaseToken, async (req, res) => {
+  try {
+    if (!usersCollection) {
+      return res.status(500).json({ success: false, error: 'Database not configured' });
+    }
+
+    const userId = req.user.uid;
+    const updateData = {
+      ...req.body,
+      id: userId,
+      updatedAt: new Date(),
+    };
+
+    const result = await usersCollection.updateOne(
+      { id: userId },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const updatedUser = await usersCollection.findOne({ id: userId });
+    res.json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    service: 'SendGrid',
-    configured: !!process.env.SENDGRID_API_KEY,
-    fromEmail: process.env.FROM_EMAIL || 'not set',
+    service: 'UniFlow Backend',
+    sendgrid: {
+      configured: !!process.env.SENDGRID_API_KEY,
+      fromEmail: process.env.FROM_EMAIL || 'not set',
+    },
+    firebase: {
+      configured: firebaseAdminInitialized,
+    },
+    mongodb: {
+      configured: !!process.env.MONGODB_URI,
+      connected: usersCollection !== null,
+    },
     timestamp: new Date().toISOString()
   });
 });
