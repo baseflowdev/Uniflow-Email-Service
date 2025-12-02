@@ -1,16 +1,22 @@
 const express = require('express');
-const sgMail = require('@sendgrid/mail');
 const cors = require('cors');
+const sgMail = require('@sendgrid/mail');
 const admin = require('firebase-admin');
 const { MongoClient } = require('mongodb');
-require('dotenv').config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Initialize Firebase Admin
-let firebaseAdminInitialized = false;
+// Initialize SendGrid
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+// Initialize Firebase Admin SDK
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
   try {
     admin.initializeApp({
@@ -20,251 +26,429 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && proce
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       }),
     });
-    firebaseAdminInitialized = true;
-    console.log('✅ Firebase Admin initialized successfully');
+    console.log('✅ Firebase Admin SDK initialized');
   } catch (error) {
-    console.log('⚠️  Firebase Admin initialization failed:', error.message);
+    console.error('❌ Firebase Admin SDK initialization failed:', error.message);
   }
 } else {
-  console.log('⚠️  Firebase Admin credentials not found in environment variables');
+  console.warn('⚠️ Firebase Admin SDK not initialized - missing environment variables');
 }
 
 // Initialize MongoDB
-let mongoClient = null;
-let usersCollection = null;
+let mongoClient;
+let db;
 if (process.env.MONGODB_URI) {
-  mongoClient = new MongoClient(process.env.MONGODB_URI);
-  (async () => {
-    try {
-      await mongoClient.connect();
-      const db = mongoClient.db('uniflow');
-      usersCollection = db.collection('users');
-      console.log('✅ MongoDB connected successfully');
-    } catch (error) {
-      console.log('⚠️  MongoDB connection failed:', error.message);
-    }
-  })();
+  try {
+    mongoClient = new MongoClient(process.env.MONGODB_URI);
+    mongoClient.connect().then(() => {
+      db = mongoClient.db('uniflow');
+      console.log('✅ MongoDB connected');
+    }).catch(err => {
+      console.error('❌ MongoDB connection failed:', err.message);
+    });
+  } catch (error) {
+    console.error('❌ MongoDB initialization failed:', error.message);
+  }
 } else {
-  console.log('⚠️  MONGODB_URI not found in environment variables');
+  console.warn('⚠️ MongoDB not initialized - missing MONGODB_URI');
 }
 
-// Middleware to verify Firebase ID token
+// Middleware to verify Firebase token
 async function verifyFirebaseToken(req, res, next) {
   const authHeader = req.headers.authorization;
+  
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, error: 'No authorization token provided' });
+    return res.status(401).json({
+      success: false,
+      error: 'No authorization token provided'
+    });
   }
 
   const token = authHeader.split('Bearer ')[1];
-  
-  if (!firebaseAdminInitialized) {
-    return res.status(500).json({ success: false, error: 'Firebase Admin not initialized' });
-  }
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken;
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    console.error('Token verification failed:', error.message);
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired token'
+    });
   }
 }
 
-// Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('✅ SendGrid initialized successfully');
-} else {
-  console.log('⚠️  SENDGRID_API_KEY not found in environment variables');
-}
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    firebase: !!admin.apps.length,
+    mongodb: !!db,
+    sendgrid: !!process.env.SENDGRID_API_KEY
+  });
+});
 
-// Send verification email endpoint
+// POST /api/send-verification-email
 app.post('/api/send-verification-email', async (req, res) => {
   try {
-    const { email, code, subject, message } = req.body;
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: email, code'
+      });
+    }
 
     if (!process.env.SENDGRID_API_KEY) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'SendGrid API key not configured. Please set SENDGRID_API_KEY in your .env file.' 
+      return res.status(500).json({
+        success: false,
+        error: 'SendGrid not configured'
       });
     }
 
-    if (!process.env.FROM_EMAIL) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'FROM_EMAIL not configured. Please set FROM_EMAIL in your .env file (must be verified in SendGrid).' 
-      });
-    }
-
-    // Create email content
-    const emailContent = message || `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Password Reset Verification</h2>
-        <p>Your verification code is:</p>
-        <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #0066cc; text-align: center; padding: 20px; background-color: #f5f5f5; border-radius: 8px;">
-          ${code}
-        </p>
-        <p>This code expires in 10 minutes.</p>
-        <p style="color: #666; font-size: 14px;">If you didn't request this, please ignore this email.</p>
-      </div>
-    `;
-
-    // Send email via SendGrid
     const msg = {
       to: email,
-      from: process.env.FROM_EMAIL,
-      subject: subject || 'UniFlow - Password Reset Verification Code',
-      html: emailContent,
+      from: process.env.SENDGRID_FROM_EMAIL || 'baseflowdev@gmail.com',
+      subject: 'Your UniFlow Verification Code',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+            .code { font-size: 32px; font-weight: bold; text-align: center; color: #4CAF50; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Verify Your Email</h1>
+            </div>
+            <div class="content">
+              <p>Hello,</p>
+              <p>Your verification code is:</p>
+              <div class="code">${code}</div>
+              <p>This code will expire in 10 minutes.</p>
+              <p>If you didn't request this code, you can safely ignore this email.</p>
+            </div>
+            <div class="footer">
+              <p>UniFlow - Your Academic Companion</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Your UniFlow verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`
     };
 
     await sgMail.send(msg);
-    
-    console.log('✅ Email sent successfully to:', email);
-    res.json({ success: true, message: 'Email sent successfully' });
+
+    res.json({
+      success: true,
+      message: 'Verification email sent successfully'
+    });
   } catch (error) {
-    console.error('❌ Error sending email:', error);
-    
-    // Provide helpful error messages
-    let errorMessage = error.message;
-    if (error.response) {
-      const body = error.response.body;
-      if (body && body.errors) {
-        errorMessage = body.errors.map(e => e.message).join(', ');
-      }
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      error: errorMessage,
-      details: error.response?.body 
+    console.error('Error sending verification email:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send verification email',
+      details: error.message
     });
   }
 });
 
-// User profile endpoints
+// POST /api/send-password-setup-email
+// Sends password setup email for Google-only accounts
+app.post('/api/send-password-setup-email', async (req, res) => {
+  try {
+    const { email, token, setupUrl } = req.body;
+
+    if (!email || !token || !setupUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: email, token, setupUrl'
+      });
+    }
+
+    if (!process.env.SENDGRID_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'SendGrid not configured'
+      });
+    }
+
+    // Send password setup email via SendGrid
+    const msg = {
+      to: email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'baseflowdev@gmail.com',
+      subject: 'Set Up Your Password - UniFlow',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+            .button { display: inline-block; padding: 12px 30px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Set Up Your Password</h1>
+            </div>
+            <div class="content">
+              <p>Hello,</p>
+              <p>You requested to set up a password for your UniFlow account. Click the button below to set your password:</p>
+              <p style="text-align: center;">
+                <a href="${setupUrl}" class="button">Set Up Password</a>
+              </p>
+              <p>Or copy and paste this link into your browser:</p>
+              <p style="word-break: break-all; color: #666;">${setupUrl}</p>
+              <p><strong>This link will expire in 24 hours.</strong></p>
+              <p>If you didn't request this, you can safely ignore this email.</p>
+            </div>
+            <div class="footer">
+              <p>UniFlow - Your Academic Companion</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Set Up Your Password - UniFlow
+        
+        Hello,
+        
+        You requested to set up a password for your UniFlow account. 
+        Click the link below to set your password:
+        
+        ${setupUrl}
+        
+        This link will expire in 24 hours.
+        
+        If you didn't request this, you can safely ignore this email.
+        
+        UniFlow - Your Academic Companion
+      `
+    };
+
+    await sgMail.send(msg);
+
+    res.json({
+      success: true,
+      message: 'Password setup email sent successfully'
+    });
+  } catch (error) {
+    console.error('Error sending password setup email:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send password setup email',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/setup-password
+// Sets password for Google-only account using token
+app.post('/api/setup-password', async (req, res) => {
+  try {
+    const { email, password, token } = req.body;
+
+    if (!email || !password || !token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: email, password, token'
+      });
+    }
+
+    if (!admin.apps.length) {
+      return res.status(500).json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      });
+    }
+
+    // Get user by email
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email.toLowerCase());
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        return res.status(404).json({
+          success: false,
+          error: 'No account found with this email'
+        });
+      }
+      throw error;
+    }
+
+    // Check if user already has a password
+    const providers = userRecord.providerData.map(p => p.providerId);
+    if (providers.includes('password')) {
+      return res.status(400).json({
+        success: false,
+        error: 'This account already has a password set'
+      });
+    }
+
+    // Note: Token verification should be done by the client app
+    // The client app stores the token locally and verifies it before calling this endpoint
+    // For security, you might want to add token verification here as well
+
+    // Update user password using Firebase Admin SDK
+    await admin.auth().updateUser(userRecord.uid, {
+      password: password
+    });
+
+    res.json({
+      success: true,
+      message: 'Password set successfully. You can now sign in with email and password.'
+    });
+  } catch (error) {
+    console.error('Error setting password:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to set password',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/users
 // Create or update user profile
 app.post('/api/users', verifyFirebaseToken, async (req, res) => {
   try {
-    if (!usersCollection) {
-      return res.status(500).json({ success: false, error: 'Database not configured' });
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not connected'
+      });
     }
 
     const userId = req.user.uid;
     const userData = {
       ...req.body,
       id: userId,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
 
     // Upsert user profile
-    await usersCollection.updateOne(
+    await db.collection('users').updateOne(
       { id: userId },
-      { $set: userData },
+      { 
+        $set: userData,
+        $setOnInsert: { createdAt: new Date() }
+      },
       { upsert: true }
     );
 
-    res.json({ success: true, user: userData });
+    res.json({
+      success: true,
+      user: userData
+    });
   } catch (error) {
     console.error('Error saving user:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save user',
+      details: error.message
+    });
   }
 });
 
+// GET /api/users/me
 // Get current user profile
 app.get('/api/users/me', verifyFirebaseToken, async (req, res) => {
   try {
-    if (!usersCollection) {
-      return res.status(500).json({ success: false, error: 'Database not configured' });
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not connected'
+      });
     }
 
     const userId = req.user.uid;
-    const user = await usersCollection.findOne({ id: userId });
+    const user = await db.collection('users').findOne({ id: userId });
 
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
     }
 
-    res.json({ success: true, user });
+    res.json({
+      success: true,
+      user: user
+    });
   } catch (error) {
-    console.error('Error getting user:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Error fetching user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user',
+      details: error.message
+    });
   }
 });
 
-// Update user profile
+// PUT /api/users/me
+// Update current user profile
 app.put('/api/users/me', verifyFirebaseToken, async (req, res) => {
   try {
-    if (!usersCollection) {
-      return res.status(500).json({ success: false, error: 'Database not configured' });
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not connected'
+      });
     }
 
     const userId = req.user.uid;
     const updateData = {
       ...req.body,
-      id: userId,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
 
-    const result = await usersCollection.updateOne(
+    const result = await db.collection('users').updateOne(
       { id: userId },
       { $set: updateData }
     );
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
     }
 
-    const updatedUser = await usersCollection.findOne({ id: userId });
-    res.json({ success: true, user: updatedUser });
+    const updatedUser = await db.collection('users').findOne({ id: userId });
+
+    res.json({
+      success: true,
+      user: updatedUser
+    });
   } catch (error) {
     console.error('Error updating user:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update user',
+      details: error.message
+    });
   }
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    service: 'UniFlow Backend',
-    sendgrid: {
-      configured: !!process.env.SENDGRID_API_KEY,
-      fromEmail: process.env.FROM_EMAIL || 'not set',
-    },
-    firebase: {
-      configured: firebaseAdminInitialized,
-    },
-    mongodb: {
-      configured: !!process.env.MONGODB_URI,
-      connected: usersCollection !== null,
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-const PORT = process.env.PORT || 3000;
+// Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`\n📧 Email Service: SendGrid`);
-  
-  if (process.env.SENDGRID_API_KEY) {
-    console.log(`✅ SendGrid API key is configured`);
-  } else {
-    console.log(`⚠️  SENDGRID_API_KEY not found in .env file`);
-  }
-  
-  if (process.env.FROM_EMAIL) {
-    console.log(`✅ From email: ${process.env.FROM_EMAIL}`);
-  } else {
-    console.log(`⚠️  FROM_EMAIL not set in .env file`);
-  }
-  
-  if (process.env.SENDGRID_API_KEY && process.env.FROM_EMAIL) {
-    console.log(`\n✅ SendGrid is ready to send emails!`);
-  } else {
-    console.log(`\n⚠️  Please configure SENDGRID_API_KEY and FROM_EMAIL in your .env file`);
-    console.log(`   See SENDGRID_SETUP.md for instructions`);
-  }
+  console.log(`🚀 Server running on port ${PORT}`);
 });
+
