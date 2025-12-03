@@ -259,6 +259,265 @@ app.post('/api/send-password-setup-email', async (req, res) => {
   }
 });
 
+// GET /api/setup-password
+// Serves HTML form for password setup
+app.get('/api/setup-password', (req, res) => {
+  const { token, email } = req.query;
+  
+  if (!token || !email) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invalid Link - UniFlow</title>
+        <style>
+          body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
+          .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+          h1 { color: #d32f2f; margin-bottom: 20px; }
+          p { color: #666; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Invalid Link</h1>
+          <p>This password setup link is invalid or missing required parameters.</p>
+          <p>Please request a new password setup link from the app.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Set Up Your Password - UniFlow</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { box-sizing: border-box; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+          display: flex; 
+          justify-content: center; 
+          align-items: center; 
+          min-height: 100vh; 
+          margin: 0; 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          padding: 20px;
+        }
+        .container { 
+          background: white; 
+          padding: 40px; 
+          border-radius: 12px; 
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2); 
+          max-width: 500px; 
+          width: 100%;
+        }
+        h1 { 
+          color: #333; 
+          margin-bottom: 10px; 
+          font-size: 28px;
+        }
+        .subtitle {
+          color: #666;
+          margin-bottom: 30px;
+          font-size: 14px;
+        }
+        .form-group {
+          margin-bottom: 20px;
+        }
+        label {
+          display: block;
+          margin-bottom: 8px;
+          color: #333;
+          font-weight: 500;
+          font-size: 14px;
+        }
+        input {
+          width: 100%;
+          padding: 12px;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          font-size: 16px;
+          transition: border-color 0.3s;
+        }
+        input:focus {
+          outline: none;
+          border-color: #667eea;
+        }
+        .error {
+          color: #d32f2f;
+          font-size: 14px;
+          margin-top: 8px;
+          display: none;
+        }
+        .error.show {
+          display: block;
+        }
+        .success {
+          color: #4caf50;
+          font-size: 14px;
+          margin-top: 8px;
+          display: none;
+        }
+        .success.show {
+          display: block;
+        }
+        button {
+          width: 100%;
+          padding: 14px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+          margin-top: 10px;
+        }
+        button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+          transform: translateY(0);
+        }
+        button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .loading {
+          display: none;
+          text-align: center;
+          margin-top: 20px;
+        }
+        .loading.show {
+          display: block;
+        }
+        .spinner {
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid #667eea;
+          border-radius: 50%;
+          width: 30px;
+          height: 30px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Set Up Your Password</h1>
+        <p class="subtitle">Enter a new password for your UniFlow account</p>
+        <form id="passwordForm">
+          <div class="form-group">
+            <label for="password">New Password</label>
+            <input type="password" id="password" name="password" required minlength="6" placeholder="Enter your new password">
+            <div class="error" id="passwordError"></div>
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required minlength="6" placeholder="Confirm your new password">
+            <div class="error" id="confirmError"></div>
+          </div>
+          <button type="submit" id="submitBtn">Set Password</button>
+          <div class="success" id="successMsg"></div>
+          <div class="error" id="errorMsg"></div>
+          <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: #666;">Setting up your password...</p>
+          </div>
+        </form>
+      </div>
+      <script>
+        const form = document.getElementById('passwordForm');
+        const passwordInput = document.getElementById('password');
+        const confirmInput = document.getElementById('confirmPassword');
+        const passwordError = document.getElementById('passwordError');
+        const confirmError = document.getElementById('confirmError');
+        const errorMsg = document.getElementById('errorMsg');
+        const successMsg = document.getElementById('successMsg');
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        const token = '${token}';
+        const email = '${email}';
+        
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          
+          // Clear previous errors
+          passwordError.classList.remove('show');
+          confirmError.classList.remove('show');
+          errorMsg.classList.remove('show');
+          successMsg.classList.remove('show');
+          
+          const password = passwordInput.value;
+          const confirmPassword = confirmInput.value;
+          
+          // Validate password length
+          if (password.length < 6) {
+            passwordError.textContent = 'Password must be at least 6 characters';
+            passwordError.classList.add('show');
+            return;
+          }
+          
+          // Validate passwords match
+          if (password !== confirmPassword) {
+            confirmError.textContent = 'Passwords do not match';
+            confirmError.classList.add('show');
+            return;
+          }
+          
+          // Show loading state
+          submitBtn.disabled = true;
+          loading.classList.add('show');
+          
+          try {
+            const response = await fetch('/api/setup-password', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: email,
+                password: password,
+                token: token
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+              successMsg.textContent = data.message || 'Password set successfully! You can now sign in with email and password.';
+              successMsg.classList.add('show');
+              form.style.display = 'none';
+              submitBtn.style.display = 'none';
+            } else {
+              errorMsg.textContent = data.error || 'Failed to set password. Please try again.';
+              errorMsg.classList.add('show');
+            }
+          } catch (error) {
+            errorMsg.textContent = 'An error occurred. Please try again later.';
+            errorMsg.classList.add('show');
+          } finally {
+            submitBtn.disabled = false;
+            loading.classList.remove('show');
+          }
+        });
+      </script>
+    </body>
+    </html>
+  `);
+});
+
 // POST /api/setup-password
 // Sets password for Google-only account using token
 app.post('/api/setup-password', async (req, res) => {
