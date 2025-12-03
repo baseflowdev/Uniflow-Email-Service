@@ -17,21 +17,71 @@ if (process.env.SENDGRID_API_KEY) {
 }
 
 // Initialize Firebase Admin SDK
+let firebaseAdminInitialized = false;
+
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
   try {
+    // Handle private key formatting - Render environment variables may have escaped newlines
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    
+    // Replace escaped newlines with actual newlines (handles both \n and \\n)
+    privateKey = privateKey.replace(/\\n/g, '\n');
+    
+    // If the key is stored as a single line without newlines, try to format it
+    // Firebase private keys are typically in PKCS#8 format
+    if (!privateKey.includes('\n') && privateKey.length > 100) {
+      // Key might be stored as a single line, try to add newlines every 64 characters
+      // But first check if it has markers
+      if (privateKey.includes('BEGIN') && privateKey.includes('END')) {
+        // Has markers but no newlines - add them
+        privateKey = privateKey
+          .replace(/-----BEGIN PRIVATE KEY-----/, '-----BEGIN PRIVATE KEY-----\n')
+          .replace(/-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----')
+          .replace(/(.{64})/g, '$1\n')
+          .replace(/\n\n/g, '\n');
+      }
+    }
+    
+    // Validate key has proper format
+    if (!privateKey.includes('BEGIN') || !privateKey.includes('END')) {
+      throw new Error('Invalid private key format: missing BEGIN/END markers. Please ensure FIREBASE_PRIVATE_KEY includes the full key with markers.');
+    }
+    
+    // Validate key is not empty
+    if (privateKey.trim().length < 100) {
+      throw new Error('Invalid private key: key appears to be too short or empty');
+    }
+    
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        privateKey: privateKey,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       }),
     });
+    
+    firebaseAdminInitialized = true;
     console.log('✅ Firebase Admin SDK initialized');
   } catch (error) {
     console.error('❌ Firebase Admin SDK initialization failed:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Environment check:', {
+      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      privateKeyLength: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.length : 0,
+      privateKeyPreview: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.substring(0, 50) + '...' : 'missing',
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+    });
+    firebaseAdminInitialized = false;
   }
 } else {
   console.warn('⚠️ Firebase Admin SDK not initialized - missing environment variables');
+  console.warn('⚠️ Missing:', {
+    FIREBASE_PROJECT_ID: !process.env.FIREBASE_PROJECT_ID,
+    FIREBASE_PRIVATE_KEY: !process.env.FIREBASE_PRIVATE_KEY,
+    FIREBASE_CLIENT_EMAIL: !process.env.FIREBASE_CLIENT_EMAIL,
+  });
+  firebaseAdminInitialized = false;
 }
 
 // Initialize MongoDB
@@ -537,11 +587,11 @@ app.post('/api/setup-password', async (req, res) => {
       });
     }
 
-    if (!admin.apps.length) {
-      console.log('❌ Firebase Admin SDK not initialized');
+    if (!admin.apps.length || !firebaseAdminInitialized) {
+      console.log('❌ Firebase Admin SDK not initialized or not verified');
       return res.status(500).json({
         success: false,
-        error: 'Firebase Admin SDK not initialized'
+        error: 'Firebase Admin SDK not properly initialized. Please check server logs and environment variables.'
       });
     }
 
