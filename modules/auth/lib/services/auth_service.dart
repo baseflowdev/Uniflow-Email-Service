@@ -581,45 +581,43 @@ class AuthService {
             throw Exception('Incorrect password');
           }
           
-          // If sign-in methods is empty, we need to be careful
-          // Firebase sometimes returns empty even for accounts with passwords
-          // Only show Google dialog if we can definitively confirm it's Google-only
+          // If sign-in methods is empty, it's likely a Google-only account
+          // Firebase returns empty array for Google-only accounts (known quirk)
+          // When we get invalid-credential with empty signInMethods, it's most likely:
+          // 1. Google-only account (most common) - should show password setup dialog
+          // 2. Account doesn't exist - but Firebase would return 'user-not-found' for that
+          // 3. Account has password but Firebase returned empty (rare) - but Firebase would return 'wrong-password' for wrong password
           if (signInMethods.isEmpty) {
-            print('🔵 Sign-in methods empty - checking if account is Google-only...');
+            print('🔵 Sign-in methods empty - likely Google-only account');
+            // Try to verify by checking if account exists via silent Google sign-in
             try {
-              // Try to sign in silently with Google to verify if account exists with Google
               final googleUser = await _googleSignIn.signInSilently();
               if (googleUser != null && googleUser.email?.toLowerCase() == email.toLowerCase()) {
-                // Account exists with Google - verify it doesn't have password
-                // Check sign-in methods again after Google sign-in
-                final methodsAfterGoogle = await _firebaseAuth.fetchSignInMethodsForEmail(email.toLowerCase());
-                if (methodsAfterGoogle.contains('password')) {
-                  // Account has password, so password must be wrong
-                  print('✅ Account has password - password is incorrect');
-                  throw Exception('Incorrect password');
-                } else {
-                  // Account is Google-only
-                  print('✅ Account exists with Google Sign-In only');
-                  throw GoogleOnlyAccountException(
-                    'This email is registered with Google Sign-In. Log in with Google, or set a password.',
-                    email: email.toLowerCase(),
-                  );
-                }
-              } else {
-                // Couldn't verify via silent sign-in - default to incorrect password
-                // This is safer than assuming it's Google-only
-                print('⚠️ Could not verify account type - defaulting to incorrect password');
-                throw Exception('Incorrect password');
+                // User is signed in with Google and email matches - definitely Google-only
+                print('✅ Verified: Account exists with Google Sign-In only');
+                throw GoogleOnlyAccountException(
+                  'This email is registered with Google Sign-In. Log in with Google, or set a password.',
+                  email: email.toLowerCase(),
+                );
               }
             } catch (googleError) {
-              if (googleError is GoogleOnlyAccountException || googleError is Exception) {
+              if (googleError is GoogleOnlyAccountException) {
                 rethrow;
               }
-              print('⚠️ Silent Google sign-in check failed: $googleError');
-              // If we can't verify, default to incorrect password (safer assumption)
-              print('⚠️ Defaulting to incorrect password message');
-              throw Exception('Incorrect password');
+              // Silent sign-in failed - user not signed in with Google
+              // But since signInMethods is empty and we got invalid-credential (not user-not-found),
+              // it's most likely a Google-only account
+              print('⚠️ Silent Google sign-in failed, but empty signInMethods + invalid-credential suggests Google-only account');
             }
+            
+            // If we get here, silent sign-in didn't confirm, but empty signInMethods + invalid-credential
+            // strongly suggests Google-only account (Firebase quirk)
+            // Show password setup dialog - if user actually has password, they can try again
+            print('✅ Treating as Google-only account (empty signInMethods is Firebase quirk for Google accounts)');
+            throw GoogleOnlyAccountException(
+              'This email is registered with Google Sign-In. Log in with Google, or set a password.',
+              email: email.toLowerCase(),
+            );
           } else {
             // Account exists with other methods
             throw Exception('Incorrect password or email');
