@@ -449,6 +449,8 @@ app.get('/api/setup-password', (req, res) => {
         
         const token = '${token}';
         const email = '${email}';
+        // Use full backend URL - get it from current origin
+        const backendUrl = window.location.origin;
         
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -481,7 +483,7 @@ app.get('/api/setup-password', (req, res) => {
           loading.classList.add('show');
           
           try {
-            const response = await fetch('/api/setup-password', {
+            const response = await fetch(backendUrl + '/api/setup-password', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -501,11 +503,12 @@ app.get('/api/setup-password', (req, res) => {
               form.style.display = 'none';
               submitBtn.style.display = 'none';
             } else {
-              errorMsg.textContent = data.error || 'Failed to set password. Please try again.';
+              errorMsg.textContent = data.error || data.details || 'Failed to set password. Please try again.';
               errorMsg.classList.add('show');
             }
           } catch (error) {
-            errorMsg.textContent = 'An error occurred. Please try again later.';
+            console.error('Error setting password:', error);
+            errorMsg.textContent = 'An error occurred: ' + error.message + '. Please try again later.';
             errorMsg.classList.add('show');
           } finally {
             submitBtn.disabled = false;
@@ -522,9 +525,12 @@ app.get('/api/setup-password', (req, res) => {
 // Sets password for Google-only account using token
 app.post('/api/setup-password', async (req, res) => {
   try {
+    console.log('🔵 Password setup request received');
     const { email, password, token } = req.body;
+    console.log('🔵 Request body:', { email: email ? 'present' : 'missing', password: password ? 'present' : 'missing', token: token ? 'present' : 'missing' });
 
     if (!email || !password || !token) {
+      console.log('❌ Missing required fields');
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: email, password, token'
@@ -532,6 +538,7 @@ app.post('/api/setup-password', async (req, res) => {
     }
 
     if (!admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized');
       return res.status(500).json({
         success: false,
         error: 'Firebase Admin SDK not initialized'
@@ -541,8 +548,11 @@ app.post('/api/setup-password', async (req, res) => {
     // Get user by email
     let userRecord;
     try {
+      console.log('🔵 Looking up user by email:', email.toLowerCase());
       userRecord = await admin.auth().getUserByEmail(email.toLowerCase());
+      console.log('✅ User found:', userRecord.uid);
     } catch (error) {
+      console.error('❌ Error looking up user:', error.code, error.message);
       if (error.code === 'auth/user-not-found') {
         return res.status(404).json({
           success: false,
@@ -554,7 +564,9 @@ app.post('/api/setup-password', async (req, res) => {
 
     // Check if user already has a password
     const providers = userRecord.providerData.map(p => p.providerId);
+    console.log('🔵 User providers:', providers);
     if (providers.includes('password')) {
+      console.log('⚠️ User already has password provider');
       return res.status(400).json({
         success: false,
         error: 'This account already has a password set'
@@ -566,16 +578,19 @@ app.post('/api/setup-password', async (req, res) => {
     // For security, you might want to add token verification here as well
 
     // Update user password using Firebase Admin SDK
+    console.log('🔵 Setting password for user:', userRecord.uid);
     await admin.auth().updateUser(userRecord.uid, {
       password: password
     });
+    console.log('✅ Password set successfully');
 
     res.json({
       success: true,
       message: 'Password set successfully. You can now sign in with email and password.'
     });
   } catch (error) {
-    console.error('Error setting password:', error);
+    console.error('❌ Error setting password:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Failed to set password',

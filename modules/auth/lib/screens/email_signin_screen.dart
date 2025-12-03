@@ -128,10 +128,13 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
   Future<void> _showGoogleOnlyAccountDialog(String email) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
+    // Capture ScaffoldMessenger before showing dialog
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Account Created with Google'),
           content: Text(
@@ -141,14 +144,14 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
               child: const Text('Send Password Setup Link'),
               onPressed: () async {
                 // Close dialog first
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
                 
                 // Wait a frame to ensure dialog is fully closed
                 await Future.delayed(const Duration(milliseconds: 100));
@@ -164,7 +167,7 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
                   final token = await userProvider.generatePasswordSetupToken(email);
                   if (mounted) {
                     if (token != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      scaffoldMessenger.showSnackBar(
                         const SnackBar(
                           content: Text('Password setup link sent to your email!'),
                           backgroundColor: Colors.green,
