@@ -612,12 +612,11 @@ class AuthService {
             
             // If we get here, silent sign-in didn't confirm, but empty signInMethods + invalid-credential
             // strongly suggests Google-only account (Firebase quirk)
-            // Show password setup dialog - if user actually has password, they can try again
-            print('✅ Treating as Google-only account (empty signInMethods is Firebase quirk for Google accounts)');
-            throw GoogleOnlyAccountException(
-              'This email is registered with Google Sign-In. Log in with Google, or set a password.',
-              email: email.toLowerCase(),
-            );
+            // However, to handle edge case where account has password but signInMethods is empty,
+            // we'll show "Incorrect password" but the UI should also show "Forgot Password?" option
+            // This way users can either try again or reset password if they have one
+            print('⚠️ Could not definitively verify account type - showing incorrect password (user can use Forgot Password if needed)');
+            throw Exception('Incorrect password');
           } else {
             // Account exists with other methods
             throw Exception('Incorrect password or email');
@@ -944,6 +943,65 @@ class AuthService {
       }
     } catch (e) {
       throw Exception('Failed to set password: ${e.toString()}');
+    }
+  }
+
+  // Send password reset email
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      print('🔵 Sending password reset email to: ${email.toLowerCase()}');
+      
+      // Check if account exists and has password
+      final signInMethods = await _firebaseAuth.fetchSignInMethodsForEmail(email.toLowerCase());
+      print('🔵 Sign-in methods found: $signInMethods');
+      
+      if (signInMethods.isEmpty) {
+        // Account might not exist or might be Google-only
+        // Try to check if it's Google-only
+        try {
+          final googleUser = await _googleSignIn.signInSilently();
+          if (googleUser != null && googleUser.email?.toLowerCase() == email.toLowerCase()) {
+            // It's a Google-only account
+            throw Exception('This email is registered with Google Sign-In. Please sign in with Google, or set a password first.');
+          }
+        } catch (e) {
+          if (e.toString().contains('Google Sign-In')) {
+            rethrow;
+          }
+        }
+        
+        // Can't determine - might not exist or might be Google-only
+        // Firebase sendPasswordResetEmail will handle this and return appropriate error
+      } else if (!signInMethods.contains('password')) {
+        // Account exists but doesn't have password
+        throw Exception('This account does not have a password set. Please sign in with your original sign-in method.');
+      }
+      
+      // Send password reset email using Firebase
+      await _firebaseAuth.sendPasswordResetEmail(
+        email: email.toLowerCase(),
+      );
+      
+      print('✅ Password reset email sent successfully');
+    } on FirebaseAuthException catch (e) {
+      print('❌ Firebase Auth error: ${e.code} - ${e.message}');
+      if (e.code == 'user-not-found') {
+        throw Exception('No account found with this email');
+      } else if (e.code == 'invalid-email') {
+        throw Exception('Invalid email address');
+      } else if (e.code == 'user-disabled') {
+        throw Exception('This account has been disabled');
+      }
+      throw Exception('Failed to send password reset email: ${e.message}');
+    } catch (e) {
+      print('❌ Error sending password reset email: $e');
+      // Re-throw if it's already our custom exception
+      if (e.toString().contains('Google Sign-In') || 
+          e.toString().contains('does not have a password') ||
+          e.toString().contains('No account found')) {
+        rethrow;
+      }
+      throw Exception('Failed to send password reset email: ${e.toString()}');
     }
   }
 

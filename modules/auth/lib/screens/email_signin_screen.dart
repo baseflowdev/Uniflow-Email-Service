@@ -125,6 +125,107 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
     );
   }
 
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController(text: _emailController.text);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter your email address and we\'ll send you a link to reset your password.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'Enter your email',
+                  prefixIcon: const Icon(Icons.email),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Send Reset Link'),
+              onPressed: () async {
+                final email = emailController.text.trim();
+                if (email.isEmpty || !email.contains('@')) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid email address'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                // Close dialog first
+                Navigator.of(dialogContext).pop();
+                
+                // Wait a frame to ensure dialog is fully closed
+                await Future.delayed(const Duration(milliseconds: 100));
+                
+                // Check if widget is still mounted before proceeding
+                if (!mounted) return;
+                
+                setState(() {
+                  _isLoading = true;
+                });
+                
+                try {
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  final success = await userProvider.sendPasswordResetEmail(email);
+                  
+                  if (mounted) {
+                    if (success) {
+                      scaffoldMessenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Password reset link sent to your email!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } else {
+                      _showErrorSnackBar(userProvider.error ?? 'Failed to send password reset email');
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    _showErrorSnackBar('Error: $e');
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      _isLoading = false;
+                    });
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _showGoogleOnlyAccountDialog(String email) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
@@ -314,6 +415,18 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
                     return null;
                   },
                 ),
+                
+                // Forgot Password link (only for sign in)
+                if (!_isSignUp) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                      child: const Text('Forgot Password?'),
+                    ),
+                  ),
+                ],
                 
                 const SizedBox(height: 24),
                 
