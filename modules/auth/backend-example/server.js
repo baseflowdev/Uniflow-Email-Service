@@ -443,9 +443,15 @@ app.get('/api/setup-password', (req, res) => {
         }
         .success {
           color: #4caf50;
-          font-size: 14px;
-          margin-top: 8px;
+          font-size: 16px;
+          margin-top: 20px;
+          padding: 20px;
+          background-color: #e8f5e9;
+          border-radius: 8px;
+          border: 2px solid #4caf50;
+          text-align: center;
           display: none;
+          font-weight: 500;
         }
         .success.show {
           display: block;
@@ -584,10 +590,15 @@ app.get('/api/setup-password', (req, res) => {
             const data = await response.json();
             
             if (response.ok && data.success) {
-              successMsg.textContent = data.message || 'Password set successfully! You can now sign in with email and password.';
+              // Show prominent success message
+              successMsg.innerHTML = '<strong style="font-size: 18px;">✅ Password Setup Successful!</strong><br><br>' + 
+                (data.message || 'Your password has been set successfully. You can now sign in with your email and password.');
               successMsg.classList.add('show');
               form.style.display = 'none';
               submitBtn.style.display = 'none';
+              
+              // Make success message more prominent
+              successMsg.style.cssText = 'color: #4caf50; font-size: 16px; margin-top: 20px; padding: 20px; background-color: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50; text-align: center; display: block;';
             } else {
               errorMsg.textContent = data.error || data.details || 'Failed to set password. Please try again.';
               errorMsg.classList.add('show');
