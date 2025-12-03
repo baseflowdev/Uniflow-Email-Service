@@ -19,70 +19,106 @@ if (process.env.SENDGRID_API_KEY) {
 // Initialize Firebase Admin SDK
 let firebaseAdminInitialized = false;
 
-if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-  try {
-    // Handle private key formatting - Render environment variables may have escaped newlines
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-    
-    // Replace escaped newlines with actual newlines (handles both \n and \\n)
-    privateKey = privateKey.replace(/\\n/g, '\n');
-    
-    // If the key is stored as a single line without newlines, try to format it
-    // Firebase private keys are typically in PKCS#8 format
-    if (!privateKey.includes('\n') && privateKey.length > 100) {
-      // Key might be stored as a single line, try to add newlines every 64 characters
-      // But first check if it has markers
-      if (privateKey.includes('BEGIN') && privateKey.includes('END')) {
-        // Has markers but no newlines - add them
-        privateKey = privateKey
-          .replace(/-----BEGIN PRIVATE KEY-----/, '-----BEGIN PRIVATE KEY-----\n')
-          .replace(/-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----')
-          .replace(/(.{64})/g, '$1\n')
-          .replace(/\n\n/g, '\n');
+// Async function to initialize and verify Firebase Admin SDK
+async function initializeFirebaseAdmin() {
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    try {
+      // Handle private key formatting - Render environment variables may have escaped newlines
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      
+      // Remove any surrounding quotes that might have been added
+      privateKey = privateKey.trim();
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+        privateKey = privateKey.slice(1, -1);
       }
+      if (privateKey.startsWith("'") && privateKey.endsWith("'")) {
+        privateKey = privateKey.slice(1, -1);
+      }
+      
+      // Replace escaped newlines with actual newlines (handles both \n and \\n)
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      
+      // If the key is stored as a single line without newlines, try to format it
+      // Firebase private keys are typically in PKCS#8 format
+      if (!privateKey.includes('\n') && privateKey.length > 100) {
+        // Key might be stored as a single line, try to add newlines every 64 characters
+        // But first check if it has markers
+        if (privateKey.includes('BEGIN') && privateKey.includes('END')) {
+          // Has markers but no newlines - add them
+          privateKey = privateKey
+            .replace(/-----BEGIN PRIVATE KEY-----/, '-----BEGIN PRIVATE KEY-----\n')
+            .replace(/-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----')
+            .replace(/(.{64})/g, '$1\n')
+            .replace(/\n\n/g, '\n');
+        }
+      }
+      
+      // Validate key has proper format
+      if (!privateKey.includes('BEGIN') || !privateKey.includes('END')) {
+        throw new Error('Invalid private key format: missing BEGIN/END markers. Please ensure FIREBASE_PRIVATE_KEY includes the full key with markers.');
+      }
+      
+      // Validate key is not empty
+      if (privateKey.trim().length < 100) {
+        throw new Error('Invalid private key: key appears to be too short or empty');
+      }
+      
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          privateKey: privateKey,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        }),
+      });
+      
+      // Actually test the credential by trying to get an access token
+      // This will fail immediately if the key is invalid
+      try {
+        const app = admin.app();
+        // Force credential validation by attempting to get access token
+        const credential = app.options.credential;
+        if (credential && credential.getAccessToken) {
+          // This will throw if the key is invalid
+          await credential.getAccessToken();
+        }
+        firebaseAdminInitialized = true;
+        console.log('✅ Firebase Admin SDK initialized and credential verified');
+      } catch (verifyError) {
+        console.error('❌ Firebase credential verification failed:', verifyError.message);
+        console.error('❌ This means the private key is invalid or malformed');
+        console.error('❌ Private key preview (first 100 chars):', privateKey.substring(0, 100));
+        console.error('❌ Private key has BEGIN marker:', privateKey.includes('BEGIN'));
+        console.error('❌ Private key has END marker:', privateKey.includes('END'));
+        console.error('❌ Private key length:', privateKey.length);
+        throw new Error(`Firebase credential invalid: ${verifyError.message}. Please check FIREBASE_PRIVATE_KEY format.`);
+      }
+    } catch (error) {
+      console.error('❌ Firebase Admin SDK initialization failed:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Environment check:', {
+        hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+        hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+        privateKeyLength: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.length : 0,
+        privateKeyPreview: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.substring(0, 50) + '...' : 'missing',
+        hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      });
+      firebaseAdminInitialized = false;
     }
-    
-    // Validate key has proper format
-    if (!privateKey.includes('BEGIN') || !privateKey.includes('END')) {
-      throw new Error('Invalid private key format: missing BEGIN/END markers. Please ensure FIREBASE_PRIVATE_KEY includes the full key with markers.');
-    }
-    
-    // Validate key is not empty
-    if (privateKey.trim().length < 100) {
-      throw new Error('Invalid private key: key appears to be too short or empty');
-    }
-    
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        privateKey: privateKey,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      }),
-    });
-    
-    firebaseAdminInitialized = true;
-    console.log('✅ Firebase Admin SDK initialized');
-  } catch (error) {
-    console.error('❌ Firebase Admin SDK initialization failed:', error.message);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Environment check:', {
-      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
-      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
-      privateKeyLength: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.length : 0,
-      privateKeyPreview: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.substring(0, 50) + '...' : 'missing',
-      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+  } else {
+    console.warn('⚠️ Firebase Admin SDK not initialized - missing environment variables');
+    console.warn('⚠️ Missing:', {
+      FIREBASE_PROJECT_ID: !process.env.FIREBASE_PROJECT_ID,
+      FIREBASE_PRIVATE_KEY: !process.env.FIREBASE_PRIVATE_KEY,
+      FIREBASE_CLIENT_EMAIL: !process.env.FIREBASE_CLIENT_EMAIL,
     });
     firebaseAdminInitialized = false;
   }
-} else {
-  console.warn('⚠️ Firebase Admin SDK not initialized - missing environment variables');
-  console.warn('⚠️ Missing:', {
-    FIREBASE_PROJECT_ID: !process.env.FIREBASE_PROJECT_ID,
-    FIREBASE_PRIVATE_KEY: !process.env.FIREBASE_PRIVATE_KEY,
-    FIREBASE_CLIENT_EMAIL: !process.env.FIREBASE_CLIENT_EMAIL,
-  });
-  firebaseAdminInitialized = false;
 }
+
+// Initialize Firebase Admin SDK (async)
+initializeFirebaseAdmin().catch(err => {
+  console.error('❌ Failed to initialize Firebase Admin SDK:', err);
+});
 
 // Initialize MongoDB
 let mongoClient;
